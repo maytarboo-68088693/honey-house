@@ -1,13 +1,32 @@
 import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import ProductCard from "../../components/ProductCard";
+import { readRows } from "../../lib/googleSheets";
+
+export const dynamic = "force-dynamic";
 
 async function getProducts() {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/products`, { cache: "no-store" });
-    if (!response.ok) return [];
-    return (await response.json()).products || [];
-  } catch { return []; }
+    const rows = await readRows("Products!A1:I1000");
+    if (!rows.length) return [];
+    const headers = rows[0].map(value => String(value).trim());
+    return rows.slice(1).filter(row => row[0]).map(row => {
+      const item = Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""]));
+      return {
+        sku: item.SKU,
+        name: item["Product Name"],
+        description: item.Description,
+        unit: item.Unit,
+        price: Number(item["Unit Price (THB)"] || 0),
+        stock: Number(item["Stock Qty"] || 0),
+        imagePath: item["Image Path"],
+        active: String(item.Active).toLowerCase() !== "false"
+      };
+    }).filter(product => product.active);
+  } catch (error) {
+    console.error("Products page error:", error);
+    return [];
+  }
 }
 
 export default async function ProductsPage() {
